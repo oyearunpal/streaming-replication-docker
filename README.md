@@ -39,6 +39,20 @@ desired configuration, simply run:
 This will create and run 2 replication-ready containers named
 `timescale-primary` and `timescale-replica`.
 
+### Run with Docker on different server
+On primary server
+```bash
+docker build -t timescale-replication .
+docker run -d --name timescale-primary --network host \
+--env-file primary.env timescale-replication
+```
+On replica server
+```bash
+docker build -t timescale-replication .
+docker run -d --name timescale-replica --network host \
+--env-file replica.env timescale-replication
+```
+
 ### Run with Docker Swarm
 
 Provided you already have a swarm intialized, you can deploy the stack using
