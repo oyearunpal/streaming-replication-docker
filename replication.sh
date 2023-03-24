@@ -25,7 +25,7 @@ fi
 # Using the hostname of the primary doesn't work with docker containers, so we resolve to an IP using getent,
 # or we use a subnet provided at runtime.
 if  [[ -z $REPLICATION_SUBNET ]]; then
-    REPLICATION_SUBNET=$(getent hosts ${REPLICATE_TO} | awk '{ print $1 }')/32
+    REPLICATION_SUBNET=$(getent hosts ${REPLICATE_TO} | awk '{ print $1 }')/24
 fi
 
 cat >> ${PGDATA}/pg_hba.conf <<EOF
@@ -41,7 +41,7 @@ else
 
 # Stop postgres instance and clear out PGDATA
 pg_ctl -D ${PGDATA} -m fast -w stop
-rm -rf ${PGDATA}
+rm -rf ${PGDATA}/*
 
 # Create a pg pass file so pg_basebackup can send a password to the primary
 cat > ~/.pgpass.conf <<EOF
@@ -59,19 +59,32 @@ do
     echo "Retrying backup . . ."
 done
 
+# standby.signal starts in postgresql mode and streams the WAL through the replication protocol.
+touch ${PGDATA}/standby.signal
+
 # Remove pg pass file -- it is not needed after backup is restored
 rm ~/.pgpass.conf
 
-# Create the recovery.conf file so the backup knows to start in recovery mode
-cat > ${PGDATA}/recovery.conf <<EOF
-standby_mode = on
+# Create the postgresql.conf file so the backup knows to start in recovery mode
+cat > ${PGDATA}/postgresql.conf <<EOF
 primary_conninfo = 'host=${REPLICATE_FROM} port=5432 user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} application_name=${REPLICA_NAME}'
 primary_slot_name = '${REPLICA_NAME}_slot'
+hot_standby = on
+wal_level = replica
+max_wal_senders = 2
+max_replication_slots = 2
+synchronous_commit = off
+listen_addresses = '*'
+max_worker_processes = 32
+max_locks_per_transaction = 256
+shared_preload_libraries = 'timescaledb'
 EOF
 
-# Ensure proper permissions on recovery.conf
-chown postgres:postgres ${PGDATA}/recovery.conf
-chmod 0600 ${PGDATA}/recovery.conf
+# hot_standby ensure that replica is only for readonly
+
+# Ensure proper permissions on postgresql.conf
+chown postgres:postgres ${PGDATA}/postgresql.conf
+chmod 0600 ${PGDATA}/postgresql.conf
 
 pg_ctl -D ${PGDATA} -w start
 

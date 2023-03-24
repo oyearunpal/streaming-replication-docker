@@ -1,7 +1,7 @@
 # Streaming Replication Container Setup for TimescaleDB
 
 Use this repository to launch a streaming replication enabled TimescaleDB
-cluster with 1 primary and 1 replica. It is based off of the `latest-pg10`
+cluster with 1 primary and 1 replica. It is based off of the `latest-pg14`
 TimescaleDB docker image.
 
 The `Dockerfile` takes advantage of PostgreSQL's [init script
